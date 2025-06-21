@@ -3,76 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sree-Siddhaarth's Web Projects Hub</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            background-color: #f4f4f4;
-            color: #333;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #0056b3;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        li {
-            margin-bottom: 15px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        li:last-child {
-            border-bottom: none;
-        }
-        a {
-            color: #007bff;
-            text-decoration: none;
-            font-size: 1.1em;
-            font-weight: bold;
-        }
-        a:hover {
-            text-decoration: underline;
-        }
-        p.info {
-            text-align: center;
-            margin-top: 40px;
-            color: #666;
-            font-style: italic;
-        }
-    </style>
+    <title>Simple FLAMES Game</title>
 </head>
 <body>
-    <div class="container">
-        <h1>Welcome to My Web Projects!</h1>
-        <p>This page serves as a central hub for various web applications and projects I've developed. Click on the links below to explore each one:</p>
 
-        <ul>
-            <li>
-                <a href="./flames-game/index.html">FLAMES Game</a>
-                <p>A simple game to predict relationship status based on names.</p>
-            </li>
-            <li>
-                <a href="./my-python-app/index.html">Snake</a>
-                <p>My first webpage</p>
-            </li>
-        </ul>
+    <h2>FLAMES Game</h2>
 
-        <p class="info">
-            All these projects are hosted from subfolders within this GitHub repository.
-        </p>
+    <p>
+        Enter two names to see your FLAMES relationship status.
+    </p>
+
+    <div>
+        <label for="name1">Your Name:</label><br>
+        <input type="text" id="name1" placeholder="e.g., Jane"><br><br>
+
+        <label for="name2">Partner's Name:</label><br>
+        <input type="text" id="name2" placeholder="e.g., John"><br><br>
+
+        <button onclick="calculateFlames()">Calculate FLAMES</button>
     </div>
+
+    <div id="output" style="margin-top: 20px;">
+        <p>Relationship Status: <span id="flamesResultDisplay"></span></p>
+    </div>
+
+    <p id="errorMessage" style="color: red; margin-top: 10px;"></p>
+
+    <script>
+        /**
+         * Cleans a name string by converting it to lowercase and removing all spaces.
+         * @param {string} name - The input name string.
+         * @returns {string[]} An array of characters of the cleaned name.
+         */
+        function cleanName(name) {
+            return name.toLowerCase().replace(/\s/g, '').split('');
+        }
+
+        /**
+         * Calculates the count of unique characters remaining after removing common characters from two names.
+         * This mimics the manual "crossing out" process of the FLAMES game.
+         * For each character in name1, if it exists in name2, one instance is removed from both.
+         * @param {string} name1Str - The first name.
+         * @param {string} name2Str - The second name.
+         * @returns {number} The total count of remaining characters.
+         */
+        function getRemainingCount(name1Str, name2Str) {
+            let n1 = cleanName(name1Str);
+            let n2 = cleanName(name2Str);
+
+            // Create temporary mutable copies for manipulation
+            let tempN1 = [...n1];
+            let tempN2 = [...n2];
+
+            // Iterate through tempN1 to find common characters and remove them from both lists
+            // We use a regular for loop with index decrementing because splice changes array length
+            for (let i = 0; i < tempN1.length; i++) {
+                const char = tempN1[i];
+                const indexInN2 = tempN2.indexOf(char);
+                if (indexInN2 !== -1) {
+                    // Character found in both, remove one instance from each
+                    tempN1.splice(i, 1); // Remove from tempN1
+                    tempN2.splice(indexInN2, 1); // Remove from tempN2
+                    i--; // Decrement i to re-check the new character at the current index
+                }
+            }
+            // The total count is the sum of lengths of the remaining characters in both lists
+            return tempN1.length + tempN2.length;
+        }
+
+        /**
+         * Calculates the FLAMES result based on the total remaining character count.
+         * This implements the circular elimination logic of the FLAMES game.
+         * @param {number} totalCount - The count of remaining letters from the names.
+         * @returns {string} The final FLAMES relationship status.
+         */
+        function getFlamesResult(totalCount) {
+            const flamesMapping = {
+                'F': 'Friends',
+                'L': 'Lovers',
+                'A': 'Affectionate',
+                'M': 'Marriage',
+                'E': 'Enemies',
+                'S': 'Siblings'
+            };
+            let flamesLetters = ['F', 'L', 'A', 'M', 'E', 'S'];
+            let currentIndex = 0; // Starting point for counting
+
+            // Continue elimination until only one letter remains
+            while (flamesLetters.length > 1) {
+                // Calculate the index of the letter to be removed.
+                // (totalCount - 1) because if totalCount is 1, it refers to the 1st element (index 0).
+                // Modulo (%) ensures the counting wraps around the current length of the array.
+                let removeIndex = (currentIndex + totalCount - 1) % flamesLetters.length;
+
+                // Remove the letter at the calculated index
+                flamesLetters.splice(removeIndex, 1);
+
+                // Update the starting index for the next round of counting.
+                // If the removed element was the last one, the new starting point is index 0.
+                // Otherwise, it's the `removeIndex` itself, as the array has shrunk and
+                // the element that was previously after the removed one now occupies this `removeIndex`.
+                currentIndex = removeIndex % flamesLetters.length;
+            }
+
+            // Return the relationship status based on the last remaining letter
+            return flamesMapping[flamesLetters[0]];
+        }
+
+        /**
+         * Main function to handle the FLAMES game calculation and display results.
+         * This function is called when the "Calculate FLAMES" button is clicked.
+         */
+        function calculateFlames() {
+            const name1Input = document.getElementById('name1');
+            const name2Input = document.getElementById('name2');
+            const flamesResultDisplay = document.getElementById('flamesResultDisplay');
+            const errorMessageDiv = document.getElementById('errorMessage');
+
+            // Clear previous results and errors
+            flamesResultDisplay.textContent = '';
+            errorMessageDiv.textContent = '';
+
+            const name1 = name1Input.value.trim();
+            const name2 = name2Input.value.trim();
+
+            // Input validation
+            if (!name1 || !name2) {
+                errorMessageDiv.textContent = 'Please enter both names.';
+                return;
+            }
+            if (!/^[a-zA-Z\s]+$/.test(name1) || !/^[a-zA-Z\s]+$/.test(name2)) {
+                errorMessageDiv.textContent = 'Names should only contain letters and spaces.';
+                return;
+            }
+
+            // Calculate the total remaining letters count
+            const totalCount = getRemainingCount(name1, name2);
+
+            // Handle edge case where totalCount is 0 (all letters cancelled out)
+            if (totalCount === 0) {
+                flamesResultDisplay.textContent = "A Perfect Match! (All letters canceled out)";
+            } else {
+                // Calculate the FLAMES result
+                const flamesResult = getFlamesResult(totalCount);
+                flamesResultDisplay.textContent = flamesResult;
+            }
+        }
+    </script>
+
 </body>
 </html>
