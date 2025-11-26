@@ -25,6 +25,12 @@
             text-align: center;
             margin-bottom: 30px;
         }
+        h2 {
+            color: #004080;
+            margin-top: 40px;
+            border-left: 4px solid #007bff;
+            padding-left: 10px;
+        }
         ul {
             list-style-type: none;
             padding: 0;
@@ -46,6 +52,23 @@
         a:hover {
             text-decoration: underline;
         }
+
+        /* Notes button styles */
+        .notes-btn {
+            display: inline-block;
+            background: #007bff;
+            color: white !important;
+            padding: 10px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            margin-top: 10px;
+            font-size: 1em;
+            transition: 0.2s;
+        }
+        .notes-btn:hover {
+            background: #0056b3;
+        }
+
         p.info {
             text-align: center;
             margin-top: 40px;
@@ -69,6 +92,21 @@
                 <p>My first webpage</p>
             </li>
         </ul>
+
+        <!-- NEW NOTES SECTION -->
+        <h2>My Notes</h2>
+        <p>You can view all my study notes from the link below:</p>
+
+        <a class="notes-btn" href="YOUR_DRIVE_FOLDER_LINK_HERE" target="_blank">
+            📁 Open Notes Folder (Google Drive)
+        </a>
+
+        <!-- If you later want to add individual note links, add them here
+        <ul>
+            <li><a href="LINK1" target="_blank">Biology – Plant Growth Notes</a></li>
+            <li><a href="LINK2" target="_blank">Physics – Gravitation Formula Sheet</a></li>
+        </ul>
+        -->
 
         <p class="info">
             All these projects are hosted from subfolders within this GitHub repository.
