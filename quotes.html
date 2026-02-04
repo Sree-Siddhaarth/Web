@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Class Quotes</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #eee;
+    margin: 30px;
+}
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+}
+.quote {
+    background: #1e1e1e;
+    border-left: 5px solid #00bfff;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 6px;
+}
+.quote p {
+    font-size: 1.2em;
+    margin: 0 0 10px 0;
+}
+button {
+    background: #00bfff;
+    border: none;
+    padding: 6px 12px;
+    color: black;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+}
+button:hover {
+    background: #009acd;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>Class Quotes</h1>
+
+<div class="quote">
+    <p id="q1">“Discipline beats motivation when motivation fades.”</p>
+    <button onclick="copyText('q1')">Copy</button>
+</div>
+
+<div class="quote">
+    <p id="q2">“Small consistent actions compound into massive results.”</p>
+    <button onclick="copyText('q2')">Copy</button>
+</div>
+
+<div class="quote">
+    <p id="q3">“Silence is a source of great strength.”</p>
+    <button onclick="copyText('q3')">Copy</button>
+</div>
+
+</div>
+
+<script>
+function copyText(id) {
+    const text = document.getElementById(id).innerText;
+    navigator.clipboard.writeText(text);
+}
+</script>
+
+</body>
+</html>
