@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Egg Catch Game</title>
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #eaf7ff;
+  }
+
+  canvas {
+    background: #cce7ff;
+    display: block;
+    margin: auto;
+  }
+
+  #controls {
+    padding: 10px;
+  }
+
+  input[type="range"] {
+    width: 80%;
+  }
+</style>
+</head>
+<body>
+
+<h2>🐔 Egg Catch Game</h2>
+<p>Score: <span id="score">0</span></p>
+
+<canvas id="gameCanvas" width="360" height="500"></canvas>
+
+<div id="controls">
+  <input type="range" id="slider" min="0" max="300" value="150">
+</div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const slider = document.getElementById("slider");
+const scoreDisplay = document.getElementById("score");
+
+let score = 0;
+
+// Basket
+const basket = {
+  x: 150,
+  y: 450,
+  width: 60,
+  height: 20
+};
+
+// Eggs
+let eggs = [];
+
+// ----------------- EGGS -----------------
+function spawnEgg() {
+  const types = [
+    { type: "normal", color: "white", value: 10 },
+    { type: "silver", color: "silver", value: 25 },
+    { type: "gold", color: "gold", value: 50 },
+    { type: "broken", color: "brown", value: -20 }
+  ];
+
+  const eggType = types[Math.floor(Math.random() * types.length)];
+
+  eggs.push({
+    x: Math.random() * (canvas.width - 15),
+    y: 40,
+    radius: 7,
+    speed: 2 + Math.random() * 2,
+    ...eggType
+  });
+}
+
+// ----------------- DRAW -----------------
+function drawChickens() {
+  ctx.fillStyle = "orange";
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.arc(60 + i * 80, 30, 15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawBasket() {
+  ctx.fillStyle = "brown";
+  ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
+}
+
+function drawEggs() {
+  eggs.forEach(egg => {
+    ctx.fillStyle = egg.color;
+    ctx.beginPath();
+    ctx.arc(egg.x, egg.y, egg.radius, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+// ----------------- UPDATE -----------------
+function updateEggs() {
+  eggs.forEach((egg, index) => {
+    egg.y += egg.speed;
+
+    if (
+      egg.y + egg.radius > basket.y &&
+      egg.x > basket.x &&
+      egg.x < basket.x + basket.width
+    ) {
+      score += egg.value;
+      scoreDisplay.textContent = score;
+      eggs.splice(index, 1);
+    }
+
+    if (egg.y > canvas.height) {
+      eggs.splice(index, 1);
+    }
+  });
+}
+
+// ----------------- SLIDER CONTROL -----------------
+slider.max = canvas.width - basket.width;
+
+slider.addEventListener("input", () => {
+  basket.x = Number(slider.value);
+});
+
+// ----------------- DRAG CONTROL -----------------
+let dragging = false;
+
+function setBasketPosition(clientX) {
+  const rect = canvas.getBoundingClientRect();
+  let x = clientX - rect.left - basket.width / 2;
+
+  x = Math.max(0, Math.min(canvas.width - basket.width, x));
+  basket.x = x;
+  slider.value = x; // sync slider
+}
+
+// Mouse
+canvas.addEventListener("mousedown", e => {
+  dragging = true;
+  setBasketPosition(e.clientX);
+});
+canvas.addEventListener("mousemove", e => {
+  if (dragging) setBasketPosition(e.clientX);
+});
+canvas.addEventListener("mouseup", () => dragging = false);
+canvas.addEventListener("mouseleave", () => dragging = false);
+
+// Touch
+canvas.addEventListener("touchstart", e => {
+  dragging = true;
+  setBasketPosition(e.touches[0].clientX);
+});
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  if (dragging) setBasketPosition(e.touches[0].clientX);
+}, { passive: false });
+canvas.addEventListener("touchend", () => dragging = false);
+
+// ----------------- GAME LOOP -----------------
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawChickens();
+  drawBasket();
+  drawEggs();
+  updateEggs();
+
+  requestAnimationFrame(gameLoop);
+}
+
+setInterval(spawnEgg, 1000);
+gameLoop();
+</script>
+
+
+</body>
+</html>
