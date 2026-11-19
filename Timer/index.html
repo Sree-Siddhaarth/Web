@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Exam Timer</title>
+<style>
+  :root { color-scheme: dark; --bg:#000; --fg:#fff; --muted:#929292; --red:#ff3030; --panel:#151515; --line:#303030; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; width:100%; min-height:100%; background:var(--bg); color:var(--fg); font-family:Arial,Helvetica,sans-serif; }
+  body { min-height:100svh; }
+  button, input, select { font:inherit; }
+  button { min-height:50px; padding:12px 18px; border:1px solid #555; border-radius:10px; background:#171717; color:#fff; touch-action:manipulation; cursor:pointer; }
+  button:active { background:#303030; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  input, select { min-height:50px; border:1px solid #555; border-radius:10px; background:#101010; color:#fff; padding:10px 12px; }
+  input:focus, select:focus, button:focus-visible { outline:2px solid #aaa; outline-offset:2px; }
+  .app { min-height:100svh; display:flex; flex-direction:column; padding:clamp(16px,3vw,32px); gap:22px; max-width:1100px; margin:0 auto; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+  .brand { color:#bbb; font-size:14px; letter-spacing:.16em; }
+  .clock { color:#aaa; font-size:clamp(16px,2vw,22px); font-variant-numeric:tabular-nums; text-align:right; }
+  .timer-area { flex:1; min-height:260px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+  .remaining { font-size:clamp(64px,15vw, min(22vw,190px)); font-size:clamp(64px,15vw,190px); line-height:1; font-weight:500; letter-spacing:.025em; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .remaining.red { color:var(--red); }
+  .remaining.blink { animation:blink 1s steps(1,end) infinite; }
+  @keyframes blink { 0%,49% { color:var(--red); } 50%,100% { color:#fff; } }
+  .caption { color:#777; font-size:12px; letter-spacing:.18em; }
+  .controls { width:min(100%,680px); margin:0 auto; display:flex; flex-direction:column; gap:16px; }
+  .duration-row { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; }
+  .field { display:flex; flex-direction:column; gap:7px; min-width:0; }
+  .field label { color:#aaa; font-size:13px; }
+  #duration { width:100%; font-size:20px; letter-spacing:.08em; font-variant-numeric:tabular-nums; }
+  .button-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .button-row button { padding-inline:8px; }
+  .settings { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .settings .field select, .settings .field input { width:100%; }
+  .hint { color:#777; font-size:12px; line-height:1.5; margin:0; }
+  .status { min-height:18px; text-align:center; color:#aaa; font-size:13px; }
+  .fullscreen-button { background:#fff; color:#000; border-color:#fff; font-weight:600; }
+  body.is-fullscreen { overflow:hidden; }
+  body.is-fullscreen .app { width:100%; max-width:none; min-height:100svh; padding:env(safe-area-inset-top) 3vw env(safe-area-inset-bottom); gap:0; }
+  body.is-fullscreen header {
+    position:absolute; top:calc(env(safe-area-inset-top) + 16px);
+    left:3vw; right:3vw; display:grid;
+    grid-template-columns:1fr 1fr; align-items:center; gap:12px;
+  }
+  body.is-fullscreen .brand { display:none; }
+  body.is-fullscreen .clock { font-size:clamp(16px,2.2vw,28px); text-align:right; }
+  body.is-fullscreen .timer-area { width:100%; min-height:100svh; padding:10vh 0; gap:0; }
+  body.is-fullscreen .remaining { font-size:clamp(72px,19vw, min(28vw,260px)); font-size:clamp(72px,19vw,260px); }
+  body.is-fullscreen .caption, body.is-fullscreen .controls { display:none !important; }
+  body.is-fullscreen .date {
+    display:block; position:static; color:#aaa; text-align:left;
+    font-size:clamp(14px,1.8vw,22px); font-variant-numeric:tabular-nums;
+  }
+  .date { display:none; }
+  @media (max-width:560px) {
+    .app { padding:16px; gap:18px; }
+    .button-row { grid-template-columns:repeat(2,1fr); }
+    .settings { grid-template-columns:1fr; }
+    .duration-row { grid-template-columns:1fr; }
+    .remaining { font-size:clamp(58px,16vw,100px); }
+  }
+  @media (orientation:landscape) and (max-height:500px) {
+    .app { padding:10px 20px; gap:8px; }
+    .timer-area { min-height:150px; }
+    .remaining { font-size:min(18vw,120px); }
+    .controls { gap:8px; }
+    .settings { grid-template-columns:1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<main class="app" id="app">
+  <header>
+    <div class="brand">EXAM TIMER</div>
+    <div class="date" id="date"></div>
+    <div class="clock" id="clock">--:--:--</div>
+  </header>
+
+  <section class="timer-area" aria-live="off">
+    <div class="remaining" id="remaining">00:00:00</div>
+    <div class="caption">TIME REMAINING</div>
+  </section>
+
+  <section class="controls" id="controls">
+    <div class="duration-row">
+      <div class="field">
+        <label for="duration">Duration (HH:MM:SS)</label>
+        <input id="duration" type="text" inputmode="numeric" autocomplete="off"
+               maxlength="8" placeholder="03:00:00" value="03:00:00"
+               aria-label="Timer duration in hours, minutes and seconds">
+      </div>
+      <button id="setDuration" type="button">Set duration</button>
+    </div>
+
+    <div class="button-row">
+      <button id="start" type="button">Start</button>
+      <button id="pause" type="button" disabled>Pause</button>
+      <button id="stop" type="button" disabled>Stop</button>
+      <button id="reset" type="button">Reset</button>
+    </div>
+
+    <div class="settings">
+      <div class="field">
+        <label for="beepType">End sound</label>
+        <select id="beepType">
+          <option value="custom" selected>Bundled file (exam-beep.mp3)</option>
+          <option value="classic">Classic beep</option>
+          <option value="double">Double beep</option>
+          <option value="low">Low beep</option>
+          <option value="high">High beep</option>
+        </select>
+      </div>
+      <div class="field" id="customAudioField" hidden>
+        <label for="audioFile">Optional audio override</label>
+        <input id="audioFile" type="file" accept="audio/*">
+      </div>
+    </div>
+    <div class="button-row" style="grid-template-columns:1fr 1fr">
+      <button id="preview" type="button">Preview sound</button>
+      <button id="fullscreen" class="fullscreen-button" type="button">Enter fullscreen</button>
+    </div>
+    <p class="hint">Place your sound file beside this HTML file and name it <b>exam-beep.mp3</b>. In fullscreen, tap anywhere to return to the controls; the countdown keeps running.</p>
+    <div class="status" id="status" role="status"></div>
+  </section>
+</main>
+
+<audio id="customAudio" preload="auto" src="./exam-beep.mp3"></audio>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const remainingEl = $('remaining');
+  const durationInput = $('duration');
+  const statusEl = $('status');
+  const clockEl = $('clock');
+  const dateEl = $('date');
+  const beepType = $('beepType');
+  const customAudio = $('customAudio');
+
+  let configuredMs = 3 * 60 * 60 * 1000;
+  let remainingMs = configuredMs;
+  let deadline = null;
+  let running = false;
+  let paused = false;
+  let intervalId = null;
+  let audioUrl = null;
+  let audioContext = null;
+
+  const pad = n => String(n).padStart(2, '0');
+  function formatTime(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+  function parseDuration(value) {
+    const match = value.trim().match(/^(\d{1,3}):([0-5]?\d):([0-5]?\d)$/);
+    if (!match) return null;
+    const h = Number(match[1]), m = Number(match[2]), s = Number(match[3]);
+    const total = ((h * 60 + m) * 60 + s) * 1000;
+    return total > 0 ? total : null;
+  }
+  function setStatus(message) { statusEl.textContent = message; }
+  function updateDisplay() {
+    const ms = running ? Math.max(0, deadline - Date.now()) : remainingMs;
+    remainingEl.textContent = formatTime(ms);
+    remainingEl.classList.toggle('red', ms <= 10 * 60 * 1000 && ms > 3 * 60 * 1000);
+    remainingEl.classList.toggle('blink', ms <= 3 * 60 * 1000 && ms > 0);
+    if (ms <= 0 && running) finishTimer();
+  }
+  function updateClock() {
+    const now = new Date();
+    clockEl.textContent = now.toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit'});
+    dateEl.textContent = now.toLocaleDateString([], {day:'2-digit', month:'short', year:'numeric'}).toUpperCase();
+  }
+  function updateButtons() {
+    $('start').disabled = running;
+    $('pause').disabled = !running && !paused;
+    $('pause').textContent = paused ? 'Resume' : 'Pause';
+    $('stop').disabled = !running && !paused;
+  }
+  function applyDuration() {
+    const parsed = parseDuration(durationInput.value);
+    if (parsed === null) {
+      setStatus('Enter a valid duration as HH:MM:SS (hours may be 1–3 digits).');
+      return false;
+    }
+    configuredMs = parsed;
+    remainingMs = parsed;
+    running = false;
+    paused = false;
+    deadline = null;
+    updateDisplay();
+    updateButtons();
+    setStatus('Duration set.');
+    return true;
+  }
+  function startTimer() {
+    if (!running && !paused) {
+      if (!applyDuration()) return;
+      remainingMs = configuredMs;
+    }
+    if (remainingMs <= 0) remainingMs = configuredMs;
+    // Resume from the stored remaining time, using wall-clock time so backgrounding
+    // or a throttled browser tab does not make the countdown drift.
+    deadline = Date.now() + remainingMs;
+    running = true;
+    paused = false;
+    ensureAudioReady();
+    setStatus('');
+    updateButtons();
+    updateDisplay();
+    if (intervalId) clearInterval(intervalId);
+    intervalId = setInterval(updateDisplay, 100);
+  }
+  function pauseTimer() {
+    if (running) {
+      remainingMs = Math.max(0, deadline - Date.now());
+      running = false;
+      paused = true;
+      deadline = null;
+      if (intervalId) clearInterval(intervalId);
+      updateDisplay();
+      updateButtons();
+      setStatus('Paused.');
+    } else if (paused) {
+      startTimer();
+    }
+  }
+  function stopTimer() {
+    if (running && deadline !== null) remainingMs = Math.max(0, deadline - Date.now());
+    running = false;
+    paused = false;
+    deadline = null;
+    if (intervalId) clearInterval(intervalId);
+    updateDisplay();
+    updateButtons();
+    setStatus('Stopped. Reset to restore the original duration.');
+  }
+  function resetTimer() {
+    running = false;
+    paused = false;
+    deadline = null;
+    if (intervalId) clearInterval(intervalId);
+    remainingMs = configuredMs;
+    durationInput.value = formatTime(configuredMs);
+    updateDisplay();
+    updateButtons();
+    setStatus('Timer reset.');
+  }
+  function finishTimer() {
+    running = false;
+    paused = false;
+    deadline = null;
+    remainingMs = 0;
+    if (intervalId) clearInterval(intervalId);
+    updateDisplay();
+    updateButtons();
+    setStatus('Time is up.');
+    playEndSound();
+  }
+
+  async function ensureAudioReady() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        if (!audioContext) audioContext = new AC();
+        if (audioContext.state === 'suspended') await audioContext.resume();
+      }
+    } catch (_) {}
+  }
+  function oscillatorBeep(freq, duration, startAt) {
+    if (!audioContext) return;
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.22, startAt + 0.015);
+    gain.gain.setValueAtTime(0.22, startAt + duration - 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    osc.connect(gain); gain.connect(audioContext.destination);
+    osc.start(startAt); osc.stop(startAt + duration);
+  }
+  async function playBeep() {
+    await ensureAudioReady();
+    if (!audioContext) return;
+    const now = audioContext.currentTime;
+    const type = beepType.value;
+    if (type === 'double') {
+      oscillatorBeep(880, .16, now);
+      oscillatorBeep(880, .16, now + .25);
+    } else {
+      const freq = type === 'low' ? 520 : type === 'high' ? 1200 : 880;
+      oscillatorBeep(freq, .28, now);
+    }
+  }
+  async function playEndSound() {
+    if (beepType.value === 'custom') {
+      if (!customAudio.src) {
+        setStatus('Time is up. Could not find ./exam-beep.mp3.');
+        return;
+      }
+      try { customAudio.currentTime = 0; await customAudio.play(); }
+      catch (_) { setStatus('Time is up. Audio playback was blocked; tap Preview sound to test it.'); }
+    } else {
+      playBeep();
+    }
+  }
+
+  $('setDuration').addEventListener('click', () => {
+    if (running || paused) {
+      setStatus('Stop or reset the timer before changing its duration.');
+      return;
+    }
+    applyDuration();
+  });
+  $('start').addEventListener('click', startTimer);
+  $('pause').addEventListener('click', pauseTimer);
+  $('stop').addEventListener('click', stopTimer);
+  $('reset').addEventListener('click', resetTimer);
+  $('preview').addEventListener('click', async () => {
+    if (beepType.value === 'custom') {
+      if (!customAudio.src) { setStatus('Place exam-beep.mp3 beside this HTML file.'); return; }
+      try { customAudio.currentTime = 0; await customAudio.play(); setStatus('Playing sound preview.'); }
+      catch (_) { setStatus('Could not play that audio file.'); }
+    } else {
+      await playBeep();
+      setStatus('Playing sound preview.');
+    }
+  });
+  beepType.addEventListener('change', () => {
+    $('customAudioField').hidden = beepType.value !== 'custom';
+    setStatus('');
+  });
+  $('audioFile').addEventListener('change', event => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    audioUrl = URL.createObjectURL(file);
+    customAudio.src = audioUrl;
+    setStatus('Selected audio file loaded. Use Preview sound to test it.');
+  });
+  durationInput.addEventListener('input', () => {
+    const digits = durationInput.value.replace(/\D/g, '').slice(0, 6);
+    if (digits.length <= 2) durationInput.value = digits;
+    else if (digits.length <= 4) durationInput.value = digits.slice(0, -2) + ':' + digits.slice(-2);
+    else durationInput.value = digits.slice(0, -4) + ':' + digits.slice(-4, -2) + ':' + digits.slice(-2);
+  });
+  durationInput.addEventListener('blur', () => {
+    const parsed = parseDuration(durationInput.value);
+    if (parsed !== null && !running && !paused) durationInput.value = formatTime(parsed);
+  });
+
+  async function enterFullscreen() {
+    try {
+      const el = document.documentElement;
+      if (!document.fullscreenElement && el.requestFullscreen) {
+        await el.requestFullscreen();
+      } else if (!document.fullscreenElement && el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else {
+        setStatus('Fullscreen is not available in this browser.');
+      }
+    } catch (_) {
+      setStatus('Chrome did not allow fullscreen. Try tapping the fullscreen button again.');
+    }
+  }
+  function syncFullscreenState() {
+    const active = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    document.body.classList.toggle('is-fullscreen', active);
+    $('fullscreen').textContent = active ? 'Exit fullscreen' : 'Enter fullscreen';
+  }
+  $('fullscreen').addEventListener('click', enterFullscreen);
+  document.addEventListener('fullscreenchange', syncFullscreenState);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+
+  // Any deliberate tap/click in fullscreen exits it. A short guard prevents the
+  // same pointer event that entered fullscreen from immediately exiting it.
+  let fullscreenEnteredAt = 0;
+  document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) fullscreenEnteredAt = Date.now();
+  });
+  document.addEventListener('pointerdown', () => {
+    if ((document.fullscreenElement || document.webkitFullscreenElement) &&
+        Date.now() - fullscreenEnteredAt > 350) {
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+  }, {passive:true});
+
+  // If the page is restored from the background, immediately recalculate against
+  // the deadline rather than relying on interval timing.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { updateClock(); updateDisplay(); }
+  });
+
+  updateClock();
+  setInterval(updateClock, 250);
+  updateDisplay();
+  updateButtons();
+})();
+</script>
+</body>
+</html>
