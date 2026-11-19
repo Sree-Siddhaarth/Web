@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#000000">
 <title>Exam Timer</title>
 <style>
-  :root { color-scheme: dark; --bg:#000; --fg:#fff; --muted:#929292; --red:#ff3030; --panel:#151515; --line:#303030; }
+  :root { color-scheme: dark; --bg:#000; --fg:#fff; --muted:#929292; --red:#ff3030; --orange:#ff9f1c; --panel:#151515; --line:#303030; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; width:100%; min-height:100%; background:var(--bg); color:var(--fg); font-family:Arial,Helvetica,sans-serif; }
   body { min-height:100svh; }
@@ -23,6 +23,7 @@
   .timer-area { flex:1; min-height:260px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
   .remaining { font-size:clamp(64px,15vw, min(22vw,190px)); font-size:clamp(64px,15vw,190px); line-height:1; font-weight:500; letter-spacing:.025em; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .remaining.red { color:var(--red); }
+  .remaining.orange { color:var(--orange); }
   .remaining.blink { animation:blink 1s steps(1,end) infinite; }
   @keyframes blink { 0%,49% { color:var(--red); } 50%,100% { color:#fff; } }
   .caption { color:#777; font-size:12px; letter-spacing:.18em; }
@@ -81,7 +82,7 @@
 
   <section class="timer-area" aria-live="off">
     <div class="remaining" id="remaining">00:00:00</div>
-    <div class="caption">TIME REMAINING</div>
+    <div class="caption" id="timerCaption">TIME REMAINING</div>
   </section>
 
   <section class="controls" id="controls">
@@ -143,6 +144,9 @@
   let configuredMs = 3 * 60 * 60 * 1000;
   let remainingMs = configuredMs;
   let deadline = null;
+  let overtime = false;
+  let overtimeElapsedMs = 0;
+  let overtimeStartedAt = null;
   let running = false;
   let paused = false;
   let intervalId = null;
@@ -166,11 +170,20 @@
   }
   function setStatus(message) { statusEl.textContent = message; }
   function updateDisplay() {
-    const ms = running ? Math.max(0, deadline - Date.now()) : remainingMs;
+    let ms;
+    if (overtime) {
+      ms = overtimeElapsedMs + (running && overtimeStartedAt !== null ? Date.now() - overtimeStartedAt : 0);
+    } else {
+      ms = running ? Math.max(0, deadline - Date.now()) : remainingMs;
+    }
+
     remainingEl.textContent = formatTime(ms);
-    remainingEl.classList.toggle('red', ms <= 10 * 60 * 1000 && ms > 3 * 60 * 1000);
-    remainingEl.classList.toggle('blink', ms <= 3 * 60 * 1000 && ms > 0);
-    if (ms <= 0 && running) finishTimer();
+    remainingEl.classList.toggle('orange', overtime);
+    remainingEl.classList.toggle('red', !overtime && ms <= 10 * 60 * 1000 && ms > 3 * 60 * 1000);
+    remainingEl.classList.toggle('blink', !overtime && ms <= 3 * 60 * 1000 && ms > 0);
+    $('timerCaption').textContent = overtime ? 'TIME ELAPSED' : 'TIME REMAINING';
+
+    if (!overtime && ms <= 0 && running) finishTimer();
   }
   function updateClock() {
     const now = new Date();
@@ -191,6 +204,9 @@
     }
     configuredMs = parsed;
     remainingMs = parsed;
+    overtime = false;
+    overtimeElapsedMs = 0;
+    overtimeStartedAt = null;
     running = false;
     paused = false;
     deadline = null;
@@ -204,10 +220,14 @@
       if (!applyDuration()) return;
       remainingMs = configuredMs;
     }
-    if (remainingMs <= 0) remainingMs = configuredMs;
-    // Resume from the stored remaining time, using wall-clock time so backgrounding
-    // or a throttled browser tab does not make the countdown drift.
-    deadline = Date.now() + remainingMs;
+    if (overtime && paused) {
+      overtimeStartedAt = Date.now();
+    } else {
+      if (remainingMs <= 0) remainingMs = configuredMs;
+      // Resume from the stored remaining time, using wall-clock time so backgrounding
+      // or a throttled browser tab does not make the countdown drift.
+      deadline = Date.now() + remainingMs;
+    }
     running = true;
     paused = false;
     ensureAudioReady();
@@ -219,10 +239,15 @@
   }
   function pauseTimer() {
     if (running) {
-      remainingMs = Math.max(0, deadline - Date.now());
+      if (overtime) {
+        overtimeElapsedMs += Date.now() - overtimeStartedAt;
+        overtimeStartedAt = null;
+      } else {
+        remainingMs = Math.max(0, deadline - Date.now());
+        deadline = null;
+      }
       running = false;
       paused = true;
-      deadline = null;
       if (intervalId) clearInterval(intervalId);
       updateDisplay();
       updateButtons();
@@ -232,7 +257,14 @@
     }
   }
   function stopTimer() {
-    if (running && deadline !== null) remainingMs = Math.max(0, deadline - Date.now());
+    if (running) {
+      if (overtime) {
+        overtimeElapsedMs += Date.now() - overtimeStartedAt;
+        overtimeStartedAt = null;
+      } else if (deadline !== null) {
+        remainingMs = Math.max(0, deadline - Date.now());
+      }
+    }
     running = false;
     paused = false;
     deadline = null;
@@ -245,6 +277,9 @@
     running = false;
     paused = false;
     deadline = null;
+    overtime = false;
+    overtimeElapsedMs = 0;
+    overtimeStartedAt = null;
     if (intervalId) clearInterval(intervalId);
     remainingMs = configuredMs;
     durationInput.value = formatTime(configuredMs);
@@ -253,14 +288,17 @@
     setStatus('Timer reset.');
   }
   function finishTimer() {
-    running = false;
-    paused = false;
+    // Switch directly into overtime. Keep the interval running so the display
+    // counts upward from zero, without requiring another button press.
+    overtime = true;
+    overtimeElapsedMs = 0;
+    overtimeStartedAt = Date.now();
     deadline = null;
-    remainingMs = 0;
-    if (intervalId) clearInterval(intervalId);
+    running = true;
+    paused = false;
     updateDisplay();
     updateButtons();
-    setStatus('Time is up.');
+    setStatus('Time is up. Overtime is counting.');
     playEndSound();
   }
 
